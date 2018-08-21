@@ -15,27 +15,41 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Arrays;
 
 
 public class Main {
 
     public static void main(String[] args) {
-        File image = loadResource("dog.jpg");
+        File dogImage = loadResource("dog.jpg");
+        File flowerImage = loadResource("flower.jpg");
         //File xception = loadResource("xception.h5");
         File testResourcesModel = loadResource("original.h5");
         File alternative = loadResource("alternative.hdf5");
+        File kerasExportV1 = loadResource("mobileNet.h5");
+        File kerasExportV2 = loadResource("mobileNetV2.h5");
 
         // Tested e.g. xception works this way. Not included due to file-size
         //testModel(image, xception);
 
+        /*
+         * SEE HERE
+         *
+         * Both exported models throw an UnsupportedKerasConfigurationException:
+         * Unsupported keras layer type ReLU. Please file an issue at http://github.com/deeplearning4j/deeplearning4j/issues.
+         */
+        testModel(dogImage, flowerImage, kerasExportV1);
+        testModel(dogImage, flowerImage, kerasExportV2);
+
         // Alternative model works. However, output array is always the same so probably not a functioning model, too.
-        testModel(image, alternative);
+        // UPDATE: See example, both images result in [[0.9998, 0.0002]]. THIS MODEL DOES NOT WORK, TOO!
+        testModel(dogImage, flowerImage, alternative);
 
         // Test model throws an error
-        testModel(image, testResourcesModel);
+        testModel(dogImage, flowerImage, testResourcesModel);
     }
 
-    private static void testModel(File imageFile, File modelFile) {
+    private static void testModel(File imageFile, File secondImageFile, File modelFile) {
         String errorMessage;
         ComputationGraph restoredCNN;
         int tileSize = 224;
@@ -61,16 +75,29 @@ public class Main {
         }
 
         try {
+            System.out.println("*******************************************");
+            System.out.println("*******************************************");
+            System.out.println("*******************************************");
+            System.out.println("Outputting sample predictions for File " + modelFile.getAbsolutePath());
+
             BufferedImage image = ImageIO.read(imageFile);
             DataNormalization scaler = new ImagePreProcessingScaler(-1.0, 1.0);
             Java2DNativeImageLoader loader = new Java2DNativeImageLoader(tileSize, tileSize, 3);
 
-            INDArray indArray = loader.asMatrix(image);
-            scaler.transform(indArray);
+            INDArray indArray1 = loader.asMatrix(image);
+            scaler.transform(indArray1);
+            INDArray[] output1 = restoredCNN.output(false, indArray1);
+            System.out.println("Output image 1: " + Arrays.toString(output1));
 
-            INDArray output = restoredCNN.outputSingle(false, indArray);
+            INDArray indArray2 = loader.asMatrix(image);
+            scaler.transform(indArray2);
+            INDArray[] output2 = restoredCNN.output(false, indArray2);
+            System.out.println("Output image 2: " + Arrays.toString(output2));
 
-            System.out.println(output);
+            INDArray[] outputOnesOnly = restoredCNN.output(Nd4j.ones(10, 3, 299, 299));
+            INDArray[] outputZeroesOnly = restoredCNN.output(Nd4j.zeros(10, 3, 299, 299));
+            System.out.println("Output Ones Only: " + Arrays.toString(outputOnesOnly));
+            System.out.println("Output Zeroes Only: " + Arrays.toString(outputZeroesOnly));
         } catch (IOException ex) {
             errorMessage = "Error Loading File";
             System.out.println(errorMessage);
